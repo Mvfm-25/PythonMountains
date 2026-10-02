@@ -1,5 +1,8 @@
 # Visualizador do mapa de alturas
-# Arrastar o mouse : orbita | Scroll : zoom | W : wireframe | R : novo mapa | ESC : sai
+# Uso : python Okulus.py [geracoes]
+# Setas / arrastar o mouse : orbita | Z / X / scroll : aproxima / afasta
+# W : wireframe | R : novo mapa | ESC : sai
+import argparse
 import math
 import glfw
 from OpenGL.GL import *
@@ -8,6 +11,10 @@ import Forge
 
 # Altura máxima do relevo, como fração da dimensão do mapa
 ESCALA_ALTURA = 0.25
+
+# Velocidades da câmera no teclado : graus por segundo & fator de zoom por segundo
+VELOCIDADE_GIRO = 90.0
+VELOCIDADE_ZOOM = 1.5
 
 # (altura, (r, g, b)), do vale ao pico
 CORES = [
@@ -116,12 +123,39 @@ class okulus :
         self.mouseAnterior = (x, y)
 
     def aoRolar(self, janela, dx, dy):
-        self.distancia = max(self.mapa.dim * 0.3, self.distancia * (0.9 ** dy))
+        self.aplicaZoom(0.9 ** dy)
+
+    def aplicaZoom(self, fator):
+        self.distancia = max(self.mapa.dim * 0.3, min(self.mapa.dim * 10, self.distancia * fator))
+
+    # Teclas seguradas : lidas a cada quadro para o movimento ser contínuo
+    def moveCamera(self, dt):
+        def apertada(tecla):
+            return glfw.get_key(self.janela, tecla) == glfw.PRESS
+
+        if apertada(glfw.KEY_LEFT):
+            self.giro -= VELOCIDADE_GIRO * dt
+        if apertada(glfw.KEY_RIGHT):
+            self.giro += VELOCIDADE_GIRO * dt
+        if apertada(glfw.KEY_UP):
+            self.inclinacao += VELOCIDADE_GIRO * dt
+        if apertada(glfw.KEY_DOWN):
+            self.inclinacao -= VELOCIDADE_GIRO * dt
+        self.inclinacao = max(5.0, min(89.0, self.inclinacao))
+
+        if apertada(glfw.KEY_Z):
+            self.aplicaZoom(VELOCIDADE_ZOOM ** -dt)
+        if apertada(glfw.KEY_X):
+            self.aplicaZoom(VELOCIDADE_ZOOM ** dt)
 
     def roda(self, largura=1024, altura=768):
         self.abreJanela(largura, altura)
         self.compilaMalha()
+        anterior = glfw.get_time()
         while not glfw.window_should_close(self.janela):
+            agora = glfw.get_time()
+            self.moveCamera(agora - anterior)
+            anterior = agora
             self.desenha()
             glfw.swap_buffers(self.janela)
             glfw.poll_events()
@@ -129,9 +163,15 @@ class okulus :
 
 if __name__ == "__main__":
     DIM = 32
-    GERACOES = 1
+
+    parser = argparse.ArgumentParser(description="Visualizador do mapa de alturas")
+    parser.add_argument("geracoes", nargs="?", type=int, default=1,
+                        help="quantas gerações rodar (padrão : 1)")
+    args = parser.parse_args()
+    if args.geracoes < 0:
+        parser.error("geracoes não pode ser negativo")
 
     m = Forge.mapa()
     m.setDim(DIM)
-    m.geraMapa(GERACOES)
-    okulus(m, GERACOES).roda()
+    m.geraMapa(args.geracoes)
+    okulus(m, args.geracoes).roda()

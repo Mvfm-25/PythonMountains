@@ -2,6 +2,9 @@
 # [02-10][mvfm]
 import random
 
+# Menor altura de pico possível após a normalização; o pico de cada mapa é sorteado entre isso & 1
+AMPLITUDE_MINIMA = 0.4
+
 class setor :
     def __init__(self, x, z):
         self.x = x
@@ -54,9 +57,23 @@ class mapa :
             for s, media in zip(linha, mediasLinha):
                 s.y = media
 
+    # Estica as alturas de volta para [0, amplitude], com amplitude sorteada entre os mapas
+    def normalizaAlturas(self):
+        alturas = [s.y for linha in self.matriz for s in linha]
+        menor, maior = min(alturas), max(alturas)
+        faixa = maior - menor
+        amplitude = random.uniform(AMPLITUDE_MINIMA, 1.0)
+        print(f"Normalizando : [{menor:.3f}, {maior:.3f}] -> [0, {amplitude:.3f}]")
+
+        for linha in self.matriz:
+            for s in linha:
+                # Mapa completamente plano : não há o que esticar
+                s.y = (s.y - menor) / faixa * amplitude if faixa else 0.0
+
     def geraMapa(self, geracoes):
         self.matriz = [[setor(i, j) for j in range(self.dim)] for i in range(self.dim)]
         for g in range(geracoes):
             print(f"Geraçao {g+1} de {geracoes}")
             self.atualizaSetores()
+        self.normalizaAlturas()
         return self.matriz

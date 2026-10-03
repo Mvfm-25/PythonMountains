@@ -1,7 +1,7 @@
 # Visualizador do mapa de alturas
 # Uso : python Okulus.py [-s subdivisoes] [-g geracoes] [-r semente]
 # Setas / arrastar o mouse : orbita | Z / X / scroll : aproxima / afasta
-# W : wireframe | C : alterna cores (altura / roleta) | R : novo mapa | ESC : sai
+# W : wireframe | C : alterna cores (altura / roleta) | L : liga / desliga a luz | R : novo mapa | ESC : sai
 # Ao sair, pergunta na tela "Salvar terreno? S/N" (ESC cancela) e salva como PlanoNN.obj
 import math
 import glfw
@@ -18,6 +18,11 @@ PERGUNTA_SALVAR = b"Salvar terreno? S/N"
 # Velocidades da câmera no teclado : graus por segundo & fator de zoom por segundo
 VELOCIDADE_GIRO = 90.0
 VELOCIDADE_ZOOM = 1.5
+
+# Luz direcional fixa no mundo (w = 0), vinda do alto & de lado para marcar as encostas
+DIRECAO_LUZ = (-0.6, 1.0, 0.4, 0.0)
+LUZ_AMBIENTE = (0.30, 0.30, 0.30, 1.0)
+LUZ_DIFUSA = (0.85, 0.85, 0.85, 1.0)
 
 # (altura, (r, g, b)), do vale ao pico
 CORES = [
@@ -45,6 +50,16 @@ def corAltura(y):
             return tuple(a + (b - a) * t for a, b in zip(c0, c1))
     return CORES[-1][1]
 
+# Normal unitária do triângulo, sempre apontando para cima (y > 0)
+def normalTriangulo(p0, p1, p2):
+    ux, uy, uz = (p1[k] - p0[k] for k in range(3))
+    vx, vy, vz = (p2[k] - p0[k] for k in range(3))
+    nx, ny, nz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
+    if ny < 0:
+        nx, ny, nz = -nx, -ny, -nz
+    comprimento = math.sqrt(nx * nx + ny * ny + nz * nz) or 1.0
+    return nx / comprimento, ny / comprimento, nz / comprimento
+
 class okulus :
     def __init__(self, mapa, geracoes):
         self.mapa = mapa
@@ -53,6 +68,7 @@ class okulus :
         self.lista = None
         self.wireframe = False
         self.roleta = False
+        self.iluminacao = True
         # Pergunta de salvar aberta na tela, esperando S / N
         self.perguntando = False
         # Câmera orbital, em graus
@@ -78,9 +94,17 @@ class okulus :
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_FLAT)
         glClearColor(0.08, 0.09, 0.12, 1.0)
+        # A cor de cada triângulo (glColor) vira o material iluminado
+        glEnable(GL_LIGHT0)
+        glLightfv(GL_LIGHT0, GL_AMBIENT, LUZ_AMBIENTE)
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, LUZ_DIFUSA)
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, (0.0, 0.0, 0.0, 1.0))
+        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE)
+        glEnable(GL_COLOR_MATERIAL)
 
     # Monta a malha uma vez só; cada quadrado entre 4 setores vira 2 triângulos
     # Na roleta, o quadrado inteiro leva a cor do setor no seu canto (i, j)
+    # Cada triângulo leva a sua normal, para a luz marcar o relevo
     def compilaMalha(self):
         matriz = self.mapa.matriz
         dim = self.mapa.dim
@@ -100,8 +124,10 @@ class okulus :
                         glColor3f(*corRoleta(a))
                     else:
                         glColor3f(*corAltura(sum(s.y for s in triangulo) / 3))
-                    for s in triangulo:
-                        glVertex3f(s.x - centro, s.y * escala, s.z - centro)
+                    vertices = [(s.x - centro, s.y * escala, s.z - centro) for s in triangulo]
+                    glNormal3f(*normalTriangulo(*vertices))
+                    for v in vertices:
+                        glVertex3f(*v)
         glEnd()
         glEndList()
 
@@ -124,6 +150,13 @@ class okulus :
                   0, 0, 0,
                   0, 1, 0)
 
+        # Posição da luz dada depois da câmera, para ela ficar presa ao mundo e não à câmera
+        glLightfv(GL_LIGHT0, GL_POSITION, DIRECAO_LUZ)
+        if self.iluminacao:
+            glEnable(GL_LIGHTING)
+        else:
+            glDisable(GL_LIGHTING)
+
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE if self.wireframe else GL_FILL)
         glCallList(self.lista)
 
@@ -138,6 +171,7 @@ class okulus :
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         glDisable(GL_DEPTH_TEST)
+        glDisable(GL_LIGHTING)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
         larguraTexto = sum(glutBitmapWidth(GLUT_BITMAP_HELVETICA_18, c) for c in PERGUNTA_SALVAR)
@@ -182,6 +216,8 @@ class okulus :
         elif tecla == glfw.KEY_C:
             self.roleta = not self.roleta
             self.compilaMalha()
+        elif tecla == glfw.KEY_L:
+            self.iluminacao = not self.iluminacao
         elif tecla == glfw.KEY_R:
             self.mapa.geraMapa(self.geracoes)
             self.compilaMalha()

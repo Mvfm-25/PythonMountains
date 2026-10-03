@@ -5,7 +5,7 @@ Hoje o algoritmo sorteia um ruído aleatório em cada setor, suaviza várias vez
 ## Melhorias rápidas
 
 1. **[IMPLEMENTADO] Semente (`-r --semente`)**: passar uma seed para `random.seed()` deixa os mapas reproduzíveis, o que ajuda a comparar o efeito de cada regra nova no mesmo terreno.
-2. **Iluminação no Okulus**: hoje não há luz, só cor por altura, e o relevo fica difícil de ler. Calcular a normal de cada triângulo e ligar `GL_LIGHTING` muda muito a visualização.
+2. **[IMPLEMENTADA] Iluminação no Okulus**: hoje não há luz, só cor por altura, e o relevo fica difícil de ler. Calcular a normal de cada triângulo e ligar `GL_LIGHTING` muda muito a visualização. Luz direcional fixa no mundo; a tecla `L` liga e desliga.
 3. **Redistribuição de altura**: aplicar `y = y ** expoente` depois da normalização. Com expoente > 1 os vales ficam planos e os picos agudos, que é a cara de uma cordilheira.
 4. **Nível do mar**: tudo abaixo de um limiar vira água, com uma cor azul e altura achatada. Dá para controlar por um parâmetro como `-a`.
 

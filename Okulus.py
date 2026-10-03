@@ -1,16 +1,19 @@
 # Visualizador do mapa de alturas
-# Uso : python Okulus.py [geracoes]
+# Uso : python Okulus.py [-s subdivisoes] [-g geracoes] [-r semente]
 # Setas / arrastar o mouse : orbita | Z / X / scroll : aproxima / afasta
 # W : wireframe | C : alterna cores (altura / roleta) | R : novo mapa | ESC : sai
-import argparse
+# Ao sair, pergunta na tela "Salvar terreno? S/N" (ESC cancela) e salva como PlanoNN.obj
 import math
 import glfw
 from OpenGL.GL import *
 from OpenGL.GLU import gluPerspective, gluLookAt
+from OpenGL.GLUT import glutInit, glutBitmapString, glutBitmapWidth, GLUT_BITMAP_HELVETICA_18
 import Forge
 
 # Altura máxima do relevo, como fração da dimensão do mapa
 ESCALA_ALTURA = 0.25
+
+PERGUNTA_SALVAR = b"Salvar terreno? S/N"
 
 # Velocidades da câmera no teclado : graus por segundo & fator de zoom por segundo
 VELOCIDADE_GIRO = 90.0
@@ -50,6 +53,8 @@ class okulus :
         self.lista = None
         self.wireframe = False
         self.roleta = False
+        # Pergunta de salvar aberta na tela, esperando S / N
+        self.perguntando = False
         # Câmera orbital, em graus
         self.giro = 45.0
         self.inclinacao = 35.0
@@ -68,6 +73,8 @@ class okulus :
         glfw.set_key_callback(self.janela, self.aoTeclar)
         glfw.set_cursor_pos_callback(self.janela, self.aoMoverMouse)
         glfw.set_scroll_callback(self.janela, self.aoRolar)
+        glfw.set_window_close_callback(self.janela, self.aoFechar)
+        glutInit()
         glEnable(GL_DEPTH_TEST)
         glShadeModel(GL_FLAT)
         glClearColor(0.08, 0.09, 0.12, 1.0)
@@ -120,11 +127,56 @@ class okulus :
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE if self.wireframe else GL_FILL)
         glCallList(self.lista)
 
+        if self.perguntando:
+            self.desenhaPergunta(largura, altura)
+
+    # Caixa semitransparente no centro da tela, por cima do terreno
+    def desenhaPergunta(self, largura, altura):
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, largura, 0, altura, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+        glDisable(GL_DEPTH_TEST)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+
+        larguraTexto = sum(glutBitmapWidth(GLUT_BITMAP_HELVETICA_18, c) for c in PERGUNTA_SALVAR)
+        x, y = (largura - larguraTexto) / 2, altura / 2
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glColor4f(0.0, 0.0, 0.0, 0.75)
+        glRectf(x - 24, y - 20, x + larguraTexto + 24, y + 32)
+        glDisable(GL_BLEND)
+
+        glColor3f(1.0, 1.0, 1.0)
+        glRasterPos2f(x, y)
+        glutBitmapString(GLUT_BITMAP_HELVETICA_18, PERGUNTA_SALVAR)
+        glEnable(GL_DEPTH_TEST)
+
+    def salvaTerreno(self):
+        nome = Forge.proximoNomeOBJ()
+        self.mapa.exportaOBJ(nome, self.mapa.dim * ESCALA_ALTURA)
+
+    # Botão de fechar da janela : em vez de sair, abre a pergunta
+    def aoFechar(self, janela):
+        if not self.perguntando:
+            glfw.set_window_should_close(janela, False)
+            self.perguntando = True
+
     def aoTeclar(self, janela, tecla, scancode, acao, mods):
         if acao != glfw.PRESS:
             return
+        if self.perguntando:
+            if tecla == glfw.KEY_S:
+                self.salvaTerreno()
+                glfw.set_window_should_close(janela, True)
+            elif tecla == glfw.KEY_N:
+                glfw.set_window_should_close(janela, True)
+            elif tecla == glfw.KEY_ESCAPE:
+                self.perguntando = False
+            return
         if tecla == glfw.KEY_ESCAPE:
-            glfw.set_window_should_close(janela, True)
+            self.perguntando = True
         elif tecla == glfw.KEY_W:
             self.wireframe = not self.wireframe
         elif tecla == glfw.KEY_C:
@@ -181,16 +233,9 @@ class okulus :
         glfw.terminate()
 
 if __name__ == "__main__":
-    DIM = 32
-
-    parser = argparse.ArgumentParser(description="Visualizador do mapa de alturas")
-    parser.add_argument("geracoes", nargs="?", type=int, default=1,
-                        help="quantas gerações rodar (padrão : 1)")
-    args = parser.parse_args()
-    if args.geracoes < 0:
-        parser.error("geracoes não pode ser negativo")
+    args = Forge.leParametros("Visualizador do mapa de alturas")
 
     m = Forge.mapa()
-    m.setDim(DIM)
-    m.geraMapa(args.geracoes)
+    m.setDim(args.subdivisoes)
+    m.geraMapa(args.geracoes, args.semente)
     okulus(m, args.geracoes).roda()

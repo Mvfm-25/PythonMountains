@@ -4,7 +4,7 @@ Hoje o algoritmo sorteia um ruído aleatório em cada setor, suaviza várias vez
 
 ## Melhorias rápidas
 
-1. **Semente (`-r --semente`)**: passar uma seed para `random.seed()` deixa os mapas reproduzíveis, o que ajuda a comparar o efeito de cada regra nova no mesmo terreno.
+1. **[IMPLEMENTADO] Semente (`-r --semente`)**: passar uma seed para `random.seed()` deixa os mapas reproduzíveis, o que ajuda a comparar o efeito de cada regra nova no mesmo terreno.
 2. **Iluminação no Okulus**: hoje não há luz, só cor por altura, e o relevo fica difícil de ler. Calcular a normal de cada triângulo e ligar `GL_LIGHTING` muda muito a visualização.
 3. **Redistribuição de altura**: aplicar `y = y ** expoente` depois da normalização. Com expoente > 1 os vales ficam planos e os picos agudos, que é a cara de uma cordilheira.
 4. **Nível do mar**: tudo abaixo de um limiar vira água, com uma cor azul e altura achatada. Dá para controlar por um parâmetro como `-a`.
@@ -31,7 +31,7 @@ O sistema já é um autômato celular (regras aplicadas por gerações), então 
 ## Infraestrutura
 
 13. **NumPy**: guardar as alturas num `ndarray` em vez de uma matriz de objetos `setor`. A média dos vizinhos vira uma convolução vetorizada, e com `-s 500` a diferença é de minutos para frações de segundo. Isso fica importante quando entrar a erosão.
-14. **Exportação**: salvar o heightmap como PNG em tons de cinza ou a malha como `.obj`, para abrir no Blender ou numa engine.
+14. **[IMPLEMENTADO] Exportação**: salvar o heightmap como PNG em tons de cinza ou a malha como `.obj`, para abrir no Blender ou numa engine. Feito só o `.obj`; o PNG ainda falta.
 
 ## Ordem sugerida
 

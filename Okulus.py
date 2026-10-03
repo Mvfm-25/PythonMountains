@@ -1,7 +1,7 @@
 # Visualizador do mapa de alturas
 # Uso : python Okulus.py [geracoes]
 # Setas / arrastar o mouse : orbita | Z / X / scroll : aproxima / afasta
-# W : wireframe | R : novo mapa | ESC : sai
+# W : wireframe | C : alterna cores (altura / roleta) | R : novo mapa | ESC : sai
 import argparse
 import math
 import glfw
@@ -24,6 +24,17 @@ CORES = [
     (1.0, (1.00, 1.00, 1.00)),
 ]
 
+# Roleta de cores distintas : 9 cores em um bloco 3x3, para nenhum setor
+# ter a mesma cor de qualquer um dos seus 8 vizinhos (inclusive diagonais)
+ROLETA = [
+    (0.90, 0.20, 0.20), (0.95, 0.60, 0.10), (0.95, 0.90, 0.20),
+    (0.30, 0.80, 0.25), (0.15, 0.70, 0.75), (0.20, 0.35, 0.90),
+    (0.60, 0.25, 0.85), (0.95, 0.45, 0.70), (0.55, 0.35, 0.20),
+]
+
+def corRoleta(s):
+    return ROLETA[(s.x % 3) * 3 + s.z % 3]
+
 def corAltura(y):
     for (y0, c0), (y1, c1) in zip(CORES, CORES[1:]):
         if y <= y1:
@@ -38,6 +49,7 @@ class okulus :
         self.janela = None
         self.lista = None
         self.wireframe = False
+        self.roleta = False
         # Câmera orbital, em graus
         self.giro = 45.0
         self.inclinacao = 35.0
@@ -61,6 +73,7 @@ class okulus :
         glClearColor(0.08, 0.09, 0.12, 1.0)
 
     # Monta a malha uma vez só; cada quadrado entre 4 setores vira 2 triângulos
+    # Na roleta, o quadrado inteiro leva a cor do setor no seu canto (i, j)
     def compilaMalha(self):
         matriz = self.mapa.matriz
         dim = self.mapa.dim
@@ -76,7 +89,10 @@ class okulus :
                 a, b = matriz[i][j], matriz[i + 1][j]
                 c, d = matriz[i + 1][j + 1], matriz[i][j + 1]
                 for triangulo in ((a, b, c), (a, c, d)):
-                    glColor3f(*corAltura(sum(s.y for s in triangulo) / 3))
+                    if self.roleta:
+                        glColor3f(*corRoleta(a))
+                    else:
+                        glColor3f(*corAltura(sum(s.y for s in triangulo) / 3))
                     for s in triangulo:
                         glVertex3f(s.x - centro, s.y * escala, s.z - centro)
         glEnd()
@@ -111,6 +127,9 @@ class okulus :
             glfw.set_window_should_close(janela, True)
         elif tecla == glfw.KEY_W:
             self.wireframe = not self.wireframe
+        elif tecla == glfw.KEY_C:
+            self.roleta = not self.roleta
+            self.compilaMalha()
         elif tecla == glfw.KEY_R:
             self.mapa.geraMapa(self.geracoes)
             self.compilaMalha()

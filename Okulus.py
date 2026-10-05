@@ -1,5 +1,11 @@
-# Visualizador do mapa de alturas
-# Uso : python Okulus.py [geracoes]
+#!/usr/bin/env python3
+# Visualizador do mapa de alturas [versão Linux / Arch]
+# Uso : ./Okulus.py [geracoes]
+# Dependências : sudo pacman -S glfw python-opengl glu
+#                pyGLFW não está nos repositórios oficiais : usar um venv
+#                python -m venv --system-site-packages .venv && .venv/bin/pip install glfw
+# Wayland & X11 : o backend segue XDG_SESSION_TYPE; para forçar o X11 (XWayland),
+#                 rodar com XDG_SESSION_TYPE=x11
 # Setas / arrastar o mouse : orbita | Z / X / scroll : aproxima / afasta
 # W : wireframe | C : alterna cores (altura / roleta) | R : novo mapa | ESC : sai
 import argparse
@@ -59,6 +65,10 @@ class okulus :
     def abreJanela(self, largura, altura):
         if not glfw.init():
             raise RuntimeError("Não foi possível iniciar o GLFW")
+        # Identificam a janela para o gerenciador : app_id no Wayland, WM_CLASS no X11
+        glfw.window_hint_string(glfw.WAYLAND_APP_ID, "okulus")
+        glfw.window_hint_string(glfw.X11_CLASS_NAME, "okulus")
+        glfw.window_hint_string(glfw.X11_INSTANCE_NAME, "okulus")
         self.janela = glfw.create_window(largura, altura, "Okulus", None, None)
         if not self.janela:
             glfw.terminate()

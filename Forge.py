@@ -48,12 +48,28 @@ class setor :
 class mapa :
     def __init__(self):
         self.dim = 0
+        # Lado do plano em unidades do mundo; None = 1 unidade entre setores vizinhos
+        self.tamanho = None
         self.matriz = []
         self.semente = None
 
     def setDim(self, dim):
         print(f"Dimensões determinadas : {dim}x{dim}")
         self.dim = dim
+
+    def setTamanho(self, tamanho):
+        self.tamanho = tamanho
+        if tamanho is not None:
+            print(f"Tamanho determinado : {tamanho}x{tamanho}")
+
+    def lado(self):
+        return self.tamanho if self.tamanho is not None else self.dim - 1
+
+    # Posição do setor no mundo, com o plano centrado na origem
+    def coordenadas(self, s, escalaAltura=1.0):
+        passo = self.lado() / (self.dim - 1)
+        centro = (self.dim - 1) / 2
+        return (s.x - centro) * passo, s.y * escalaAltura, (s.z - centro) * passo
 
     def atualizaSetores(self):
         # 1ª passada : calcula todas as médias com as alturas ainda intactas
@@ -94,13 +110,13 @@ class mapa :
     # Salva a malha como .obj : um vértice por setor & 2 triângulos por quadrado, como no Okulus
     # Faces em sentido anti-horário visto de cima, para a normal apontar para o céu
     def exportaOBJ(self, caminho, escalaAltura=1.0):
-        centro = (self.dim - 1) / 2
         indice = lambda i, j: i * self.dim + j + 1
         with open(caminho, "w", encoding="utf-8") as arquivo:
-            arquivo.write(f"# PythonMountains : {self.dim}x{self.dim}, semente {self.semente}\n")
+            arquivo.write(f"# PythonMountains : {self.dim}x{self.dim}, lado {self.lado()}, semente {self.semente}\n")
             for linha in self.matriz:
                 for s in linha:
-                    arquivo.write(f"v {s.x - centro} {s.y * escalaAltura:.6f} {s.z - centro}\n")
+                    x, y, z = self.coordenadas(s, escalaAltura)
+                    arquivo.write(f"v {x:.6f} {y:.6f} {z:.6f}\n")
             for i in range(self.dim - 1):
                 for j in range(self.dim - 1):
                     a, b = indice(i, j), indice(i + 1, j)
@@ -124,11 +140,13 @@ def leSemente(texto):
     except ValueError:
         return texto
 
-# Parâmetros de linha de comando compartilhados : -s subdivisões, -g gerações & -r semente
+# Parâmetros de linha de comando compartilhados : -s subdivisões, -d tamanho, -g gerações & -r semente
 def leParametros(descricao):
     parser = argparse.ArgumentParser(description=descricao)
     parser.add_argument("-s", "--subdivisoes", type=int, default=SUBDIVISOES_PADRAO,
                         help=f"setores por lado do plano (padrão : {SUBDIVISOES_PADRAO})")
+    parser.add_argument("-d", "--tamanho", type=float, default=None,
+                        help="lado do plano em unidades do mundo (padrão : 1 unidade entre setores)")
     parser.add_argument("-g", "--geracoes", type=int, default=GERACOES_PADRAO,
                         help=f"quantas gerações de regras aplicar (padrão : {GERACOES_PADRAO})")
     parser.add_argument("-r", "--semente", type=leSemente, default=None,
@@ -138,10 +156,13 @@ def leParametros(descricao):
         parser.error("subdivisoes precisa ser pelo menos 2")
     if args.geracoes < 0:
         parser.error("geracoes não pode ser negativo")
+    if args.tamanho is not None and args.tamanho <= 0:
+        parser.error("tamanho precisa ser positivo")
     return args
 
 if __name__ == "__main__":
     args = leParametros("Gerador de montanhas")
     m = mapa()
     m.setDim(args.subdivisoes)
+    m.setTamanho(args.tamanho)
     m.geraMapa(args.geracoes, args.semente)

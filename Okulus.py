@@ -1,5 +1,5 @@
 # Visualizador do mapa de alturas
-# Uso : python Okulus.py [-s subdivisoes] [-g geracoes] [-r semente]
+# Uso : python Okulus.py [-s subdivisoes] [-d tamanho] [-g geracoes] [-r semente]
 # Setas / arrastar o mouse : orbita | Z / X / scroll : aproxima / afasta
 # W : wireframe | C : alterna cores (altura / roleta) | L : liga / desliga a luz | R : novo mapa | ESC : sai
 # Ao sair, pergunta na tela "Salvar terreno? S/N" (ESC cancela) e salva como PlanoNN.obj
@@ -10,7 +10,7 @@ from OpenGL.GLU import gluPerspective, gluLookAt
 from OpenGL.GLUT import glutInit, glutBitmapString, glutBitmapWidth, GLUT_BITMAP_HELVETICA_18
 import Forge
 
-# Altura máxima do relevo, como fração da dimensão do mapa
+# Altura máxima do relevo, como fração do lado do plano
 ESCALA_ALTURA = 0.25
 
 PERGUNTA_SALVAR = b"Salvar terreno? S/N"
@@ -74,7 +74,7 @@ class okulus :
         # Câmera orbital, em graus
         self.giro = 45.0
         self.inclinacao = 35.0
-        self.distancia = mapa.dim * 1.6
+        self.distancia = mapa.lado() * 1.6
         self.mouseAnterior = None
 
     def abreJanela(self, largura, altura):
@@ -108,8 +108,7 @@ class okulus :
     def compilaMalha(self):
         matriz = self.mapa.matriz
         dim = self.mapa.dim
-        centro = (dim - 1) / 2
-        escala = dim * ESCALA_ALTURA
+        escala = self.mapa.lado() * ESCALA_ALTURA
         if self.lista is not None:
             glDeleteLists(self.lista, 1)
         self.lista = glGenLists(1)
@@ -124,7 +123,7 @@ class okulus :
                         glColor3f(*corRoleta(a))
                     else:
                         glColor3f(*corAltura(sum(s.y for s in triangulo) / 3))
-                    vertices = [(s.x - centro, s.y * escala, s.z - centro) for s in triangulo]
+                    vertices = [self.mapa.coordenadas(s, escala) for s in triangulo]
                     glNormal3f(*normalTriangulo(*vertices))
                     for v in vertices:
                         glVertex3f(*v)
@@ -138,7 +137,7 @@ class okulus :
 
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        gluPerspective(45.0, largura / max(altura, 1), 0.1, self.mapa.dim * 20)
+        gluPerspective(45.0, largura / max(altura, 1), 0.1, self.mapa.lado() * 20)
 
         giro = math.radians(self.giro)
         inclinacao = math.radians(self.inclinacao)
@@ -189,7 +188,7 @@ class okulus :
 
     def salvaTerreno(self):
         nome = Forge.proximoNomeOBJ()
-        self.mapa.exportaOBJ(nome, self.mapa.dim * ESCALA_ALTURA)
+        self.mapa.exportaOBJ(nome, self.mapa.lado() * ESCALA_ALTURA)
 
     # Botão de fechar da janela : em vez de sair, abre a pergunta
     def aoFechar(self, janela):
@@ -233,7 +232,7 @@ class okulus :
         self.aplicaZoom(0.9 ** dy)
 
     def aplicaZoom(self, fator):
-        self.distancia = max(self.mapa.dim * 0.3, min(self.mapa.dim * 10, self.distancia * fator))
+        self.distancia = max(self.mapa.lado() * 0.3, min(self.mapa.lado() * 10, self.distancia * fator))
 
     # Teclas seguradas : lidas a cada quadro para o movimento ser contínuo
     def moveCamera(self, dt):
@@ -273,5 +272,6 @@ if __name__ == "__main__":
 
     m = Forge.mapa()
     m.setDim(args.subdivisoes)
+    m.setTamanho(args.tamanho)
     m.geraMapa(args.geracoes, args.semente)
     okulus(m, args.geracoes).roda()
